@@ -1,0 +1,22 @@
+# env file
+.env
+
+# python cache
+__pycache__/
+*.pyc
+
+# virtual environment
+venv/
+.env/
+
+# vscode settings
+.vscode/
+
+# mac
+.DS_Store
+
+# logs
+*.log
+
+# database local files (agar sqlite ishlatilsa)
+*.db
