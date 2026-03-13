@@ -1,294 +1,488 @@
-from datetime import datetime, timedelta
-from sqlalchemy import select, func
-from sqlalchemy.exc import IntegrityError
+from datetime import datetime
+from sqlalchemy import select
+
 from .db import SessionLocal
-from .models import Author, Book, Student, Borrow
+from .models import Author
+from .models import Book
+from .models import Borrow
+from .models import Student
 
 
-# ---------------- AUTHOR CRUD ----------------
+def create_author(name: str, bio: str | None = None) -> Author | None:
+    """
+    Yangi muallif yaratadi.
 
+    Agar shu nom bilan muallif mavjud bo\'lsa,
+    yangi yozuv qo\'shilmaydi va mavjud muallif qaytariladi.
+    """
 
-def create_author(name: str, bio: str | None = None):
-    with SessionLocal() as db:
+    with SessionLocal() as session:
+        stmt = select(Author).where(Author.name == name)
+        existing_author = session.execute(stmt).scalars().first()
+
+        if existing_author:
+            print(f"Author '{name}' already exists.")
+            return existing_author
+
         author = Author(name=name, bio=bio)
-        db.add(author)
-        db.commit()
-        db.refresh(author)
+
+        session.add(author)
+        session.commit()
+        session.refresh(author)
+
         return author
 
 
+def get_author_by_id(author_id: int) -> Author | None:
+    """
+    ID orqali muallifni topadi.
 
-def get_author_by_id(author_id: int):
-    with SessionLocal() as db:
-        return db.get(Author, author_id)
+    Args:
+        author_id (int): Muallif identifikatori.
+
+    Returns:
+        Author | None: Agar muallif topilsa Author obyektini,
+        aks holda None qaytaradi.
+    """
+    with SessionLocal() as session:
+        stmt = select(Author).where(Author.id == author_id)
+        author = session.execute(stmt).scalar_one_or_none()
+        return author
 
 
-def get_all_authors():
-    with SessionLocal() as db:
-        return db.scalars(select(Author)).all()
+def get_all_authors() -> list[Author]:
+    """
+    Barcha mualliflarni qaytaradi.
+
+    Returns:
+        list[Author]: Mualliflar ro'yxati.
+    """
+    with SessionLocal() as session:
+        stmt = select(Author)
+        authors = session.execute(stmt).scalars().all()
+        return authors
 
 
-def update_author(author_id: int, name=None, bio=None):
-    with SessionLocal() as db:
-        author = db.get(Author, author_id)
+def update_author(
+    author_id: int, name: str | None = None, bio: str | None = None
+) -> Author | None:
+    """
+    Muallif ma'lumotlarini yangilaydi.
 
-        if not author:
+    Args:
+        author_id (int): Muallif identifikatori.
+        name (str | None): Yangi ism.
+        bio (str | None): Yangi bio.
+
+    Returns:
+        Author | None: Yangilangan muallif yoki None agar topilmasa.
+    """
+    with SessionLocal() as session:
+        stmt = select(Author).where(Author.id == author_id)
+        author = session.execute(stmt).scalar_one_or_none()
+
+        if author is None:
             return None
 
-        if name:
+        if name is not None:
             author.name = name
 
-        if bio:
+        if bio is not None:
             author.bio = bio
 
-        db.commit()
-        db.refresh(author)
+        session.commit()
+        session.refresh(author)
 
         return author
 
 
-def delete_author(author_id: int):
-    with SessionLocal() as db:
-        author = db.get(Author, author_id)
+def delete_author(author_id: int) -> bool:
+    """
+    Muallifni o'chiradi.
 
-        if not author:
+    Agar muallifga tegishli kitoblar mavjud bo'lsa,
+    o'chirish amalga oshirilmaydi.
+
+    Args:
+        author_id (int): Muallif identifikatori.
+
+    Returns:
+        bool: True agar muvaffaqiyatli o'chirilsa,
+        False agar muallif topilmasa yoki kitoblari mavjud bo'lsa.
+    """
+    with SessionLocal() as session:
+        stmt = select(Author).where(Author.id == author_id)
+        author = session.execute(stmt).scalar_one_or_none()
+
+        if author is None:
             return False
 
         if author.books:
             return False
 
-        db.delete(author)
-        db.commit()
+        session.delete(author)
+        session.commit()
 
         return True
 
 
-# ---------------- BOOK CRUD ----------------
+def create_book(
+    title: str, author_id: int, published_year: int, isbn: str | None = None
+) -> Book | None:
+    """
+    Yangi kitob yaratadi.
 
-def create_book(title, author_id, published_year, isbn=None):
+    Agar shu nom bilan kitob mavjud bo\'lsa,
+    yangi yozuv qo\'shilmaydi va mavjud kitob qaytariladi.
+    """
 
-    with SessionLocal() as db:
+    with SessionLocal() as session:
+        stmt = select(Book).where(Book.title == title)
+        existing_book = session.execute(stmt).scalars().first()
+
+        if existing_book:
+            print(f"Book '{title}' already exists.")
+            return existing_book
+
         book = Book(
             title=title,
             author_id=author_id,
             published_year=published_year,
-            isbn=isbn
+            isbn=isbn,
         )
 
-        try:
-            db.add(book)
-            db.commit()
-            db.refresh(book)
-            return book
+        session.add(book)
+        session.commit()
+        session.refresh(book)
 
-        except IntegrityError:
-            db.rollback()
-            return None
+        return book
 
 
-def get_book_by_id(book_id):
-    with SessionLocal() as db:
-        return db.get(Book, book_id)
+def get_book_by_id(book_id: int) -> Book | None:
+    """
+    ID orqali kitobni topadi.
+
+    Args:
+        book_id (int): Kitob identifikatori.
+
+    Returns:
+        Book | None: Agar kitob topilsa Book obyektini,
+        aks holda None qaytaradi.
+    """
+    with SessionLocal() as session:
+        stmt = select(Book).where(Book.id == book_id)
+        book = session.execute(stmt).scalar_one_or_none()
+
+        return book
 
 
-def get_all_books():
-    with SessionLocal() as db:
-        return db.scalars(select(Book)).all()
+def get_all_books() -> list[Book]:
+    """
+    Barcha kitoblarni qaytaradi.
+
+    Returns:
+        list[Book]: Kitoblar ro'yxati.
+    """
+    with SessionLocal() as session:
+        stmt = select(Book)
+        books = session.execute(stmt).scalars().all()
+
+        return books
 
 
-def search_books_by_title(title):
+def search_books_by_title(title: str) -> list[Book]:
+    """
+    Kitoblarni nomi bo'yicha qidiradi (partial match).
 
-    with SessionLocal() as db:
+    Args:
+        title (str): Qidirilayotgan kitob nomi.
+
+    Returns:
+        list[Book]: Mos keluvchi kitoblar ro'yxati.
+    """
+    with SessionLocal() as session:
         stmt = select(Book).where(Book.title.ilike(f"%{title}%"))
-        return db.scalars(stmt).all()
+        books = session.execute(stmt).scalars().all()
+
+        return books
 
 
-def delete_book(book_id):
+def delete_book(book_id: int) -> bool:
+    """
+    Kitobni o'chiradi.
 
-    with SessionLocal() as db:
+    Args:
+        book_id (int): Kitob identifikatori.
 
-        book = db.get(Book, book_id)
+    Returns:
+        bool: True agar muvaffaqiyatli o'chirilsa,
+        False agar kitob topilmasa.
+    """
+    with SessionLocal() as session:
+        book = session.get(Book, book_id)
 
-        if not book:
+        if book is None:
             return False
 
-        db.delete(book)
-        db.commit()
+        session.delete(book)
+        session.commit()
 
         return True
 
 
-# ---------------- STUDENT CRUD ----------------
+def create_student(
+    full_name: str, email: str, grade: str | None = None
+) -> Student | None:
+    """
+    Yangi talaba yaratadi.
 
-def create_student(full_name, email, grade=None):
+    Agar shu email bilan talaba bazada mavjud bo\'lsa,
+    yangi talaba qo\'shilmaydi va mavjud talaba qaytariladi.
 
-    with SessionLocal() as db:
+    Args:
+        full_name (str): Talabaning to\'liq ismi
+        email (str): Talabaning email manzili
+        grade (str | None): Talabaning kursi yoki sinfi
 
-        student = Student(
-            full_name=full_name,
-            email=email,
-            grade=grade
-        )
+    Returns:
+        Student | None: Yangi yaratilgan yoki mavjud talaba
+    """
 
-        try:
-            db.add(student)
-            db.commit()
-            db.refresh(student)
-            return student
+    with SessionLocal() as session:
+        stmt = select(Student).where(Student.email == email)
+        existing_student = session.execute(stmt).scalars().first()
 
-        except IntegrityError:
-            db.rollback()
-            return None
+        if existing_student:
+            print(f"Student with email '{email}' already exists.")
+            return existing_student
 
+        student = Student(full_name=full_name, email=email, grade=grade)
 
-def get_student_by_id(student_id):
-
-    with SessionLocal() as db:
-        return db.get(Student, student_id)
-
-
-def get_all_students():
-
-    with SessionLocal() as db:
-        return db.scalars(select(Student)).all()
-
-
-def update_student_grade(student_id, grade):
-
-    with SessionLocal() as db:
-
-        student = db.get(Student, student_id)
-
-        if not student:
-            return None
-
-        student.grade = grade
-
-        db.commit()
-        db.refresh(student)
+        session.add(student)
+        session.commit()
+        session.refresh(student)
 
         return student
 
 
-# ---------------- BORROW LOGIC ----------------
+def get_student_by_id(student_id: int) -> Student | None:
+    """
+    ID orqali talabani topadi.
 
-def borrow_book(student_id, book_id):
+    Args:
+        student_id (int): Talaba identifikatori.
 
-    with SessionLocal() as db:
+    Returns:
+        Student | None: Agar talaba topilsa Student obyektini,
+        aks holda None qaytaradi.
+    """
+    with SessionLocal() as session:
+        stmt = select(Student).where(Student.id == student_id)
+        student = session.execute(stmt).scalar_one_or_none()
 
-        student = db.get(Student, student_id)
-        book = db.get(Book, book_id)
+        return student
 
-        if not student or not book:
+
+def get_all_students() -> list[Student]:
+    """
+    Barcha talabalarni qaytaradi.
+
+    Returns:
+        list[Student]: Talabalar ro'yxati.
+    """
+    with SessionLocal() as session:
+        stmt = select(Student)
+        students = session.execute(stmt).scalars().all()
+
+        return students
+
+
+def update_student_grade(student_id: int, grade: str) -> Student | None:
+    """
+    Talabaning kursini yangilaydi.
+
+    Args:
+        student_id (int): Talaba identifikatori.
+        grade (str): Yangi kurs yoki sinf.
+
+    Returns:
+        Student | None: Yangilangan talaba obyektini,
+        aks holda None qaytaradi.
+    """
+    with SessionLocal() as session:
+        stmt = select(Student).where(Student.id == student_id)
+        student = session.execute(stmt).scalar_one_or_none()
+
+        if student is None:
+            return None
+
+        student.grade = grade
+
+        session.commit()
+        session.refresh(student)
+
+        return student
+
+
+def borrow_book(student_id: int, book_id: int) -> Borrow | None:
+    """
+    Talabaga kitob berish funksiyasi.
+    """
+
+    with SessionLocal() as session:
+        student = session.get(Student, student_id)
+        book = session.get(Book, book_id)
+
+        if student is None or book is None:
             return None
 
         if not book.is_available:
+            print("Book is not available.")
             return None
 
-        active_borrows = db.scalar(
-            select(func.count())
-            .select_from(Borrow)
-            .where(
-                Borrow.student_id == student_id,
-                Borrow.returned_at == None
-            )
+        stmt = select(Borrow).where(
+            Borrow.student_id == student_id,
+            Borrow.book_id == book_id,
+            Borrow.returned_at.is_(None),
         )
 
-        if active_borrows >= 3:
+        existing_borrow = session.execute(stmt).scalars().first()
+
+        if existing_borrow:
+            print("Borrow record already exists.")
+            return existing_borrow
+
+        stmt = select(Borrow).where(
+            Borrow.student_id == student_id, Borrow.returned_at.is_(None)
+        )
+
+        active_borrows = session.execute(stmt).scalars().all()
+
+        if len(active_borrows) >= 3:
+            print("Student already has 3 borrowed books.")
             return None
 
-        borrow = Borrow(
-            student_id=student_id,
-            book_id=book_id,
-            borrowed_at=datetime.utcnow(),
-            due_date=datetime.utcnow() + timedelta(days=14)
-        )
+        borrow = Borrow(student_id=student_id, book_id=book_id)
 
         book.is_available = False
 
-        db.add(borrow)
-        db.commit()
-        db.refresh(borrow)
+        session.add(borrow)
+        session.commit()
+        session.refresh(borrow)
 
         return borrow
 
 
-def return_book(borrow_id):
+def return_book(borrow_id: int) -> bool:
+    """
+    Kitobni qaytarish funksiyasi.
 
-    with SessionLocal() as db:
+    Args:
+        borrow_id (int): Borrow identifikatori.
 
-        borrow = db.get(Borrow, borrow_id)
+    Returns:
+        bool: True agar muvaffaqiyatli qaytarilsa,
+        False agar borrow topilmasa.
+    """
 
-        if not borrow or borrow.returned_at:
+    with SessionLocal() as session:
+        borrow = session.get(Borrow, borrow_id)
+
+        if borrow is None:
+            return False
+        if borrow.returned_at is not None:
             return False
 
         borrow.returned_at = datetime.utcnow()
 
         borrow.book.is_available = True
 
-        db.commit()
+        session.commit()
 
         return True
 
 
-# ---------------- EXTRA QUERIES ----------------
+def get_student_borrow_count(student_id: int) -> int:
+    """
+    Talabaning jami olgan kitoblari sonini hisoblaydi.
 
-def get_student_borrow_count(student_id):
+    Args:
+        student_id (int): Talaba identifikatori.
 
-    with SessionLocal() as db:
+    Returns:
+        int: Talabaning jami borrow qilgan kitoblari soni.
+    """
 
-        return db.scalar(
-            select(func.count())
-            .select_from(Borrow)
-            .where(Borrow.student_id == student_id)
-        )
+    with SessionLocal() as session:
+        stmt = select(Borrow).where(Borrow.student_id == student_id)
+
+        borrows = session.execute(stmt).scalars().all()
+
+        return len(borrows)
 
 
-def get_currently_borrowed_books():
+def get_currently_borrowed_books() -> list[tuple[Book, Student, datetime]]:
+    """
+    Hozirda band bo'lgan kitoblar va ularni olgan talabalar.
 
-    with SessionLocal() as db:
+    Returns:
+        list[tuple[Book, Student, datetime]]:
+        (Book, Student, borrowed_at) ko'rinishidagi ro'yxat.
+    """
 
+    with SessionLocal() as session:
         stmt = (
             select(Book, Student, Borrow.borrowed_at)
-            .join(Borrow)
+            .select_from(Borrow)
+            .join(Book)
             .join(Student)
-            .where(Borrow.returned_at == None)
+            .where(Borrow.returned_at.is_(None))
         )
 
-        return db.execute(stmt).all()
+        result = session.execute(stmt).all()
+
+        return result
 
 
-def get_books_by_author(author_id):
+def get_books_by_author(author_id: int) -> list[Book]:
+    """
+    Muayyan muallifning barcha kitoblarini qaytaradi.
 
-    with SessionLocal() as db:
+    Args:
+        author_id (int): Muallif identifikatori.
 
+    Returns:
+        list[Book]: Muallifga tegishli kitoblar ro'yxati.
+    """
+
+    with SessionLocal() as session:
         stmt = select(Book).where(Book.author_id == author_id)
 
-        return db.scalars(stmt).all()
+        books = session.execute(stmt).scalars().all()
+
+        return books
 
 
-def get_overdue_borrows():
+def get_overdue_borrows() -> list[tuple[Borrow, Student, Book, int]]:
+    """
+    Qaytarish muddati o'tib ketgan kitoblarni aniqlaydi.
 
-    with SessionLocal() as db:
+    Returns:
+        list[tuple[Borrow, Student, Book, int]]:
+        (Borrow, Student, Book, kechikkan_kunlar) ko'rinishidagi ro'yxat.
+    """
 
-        now = datetime.utcnow()
-
-        stmt = (
-            select(Borrow, Student, Book)
-            .join(Student)
-            .join(Book)
-            .where(
-                Borrow.returned_at == None,
-                Borrow.due_date < now
-            )
+    with SessionLocal() as session:
+        stmt = select(Borrow).where(
+            Borrow.returned_at.is_(None), Borrow.due_date < datetime.utcnow()
         )
 
-        results = []
+        borrows = session.execute(stmt).scalars().all()
 
-        for borrow, student, book in db.execute(stmt).all():
+        result = []
 
-            days_late = (now - borrow.due_date).days
+        for b in borrows:
+            days_late = (datetime.utcnow() - b.due_date).days
+            result.append((b, b.student, b.book, days_late))
 
-            results.append((borrow, student, book, days_late))
-
-        return results
+        return result
