@@ -1,300 +1,292 @@
-from sqlalchemy import select
 from datetime import datetime, timedelta
+from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from .db import SessionLocal
 from .models import Author, Book, Student, Borrow
 
 
-# ======================
-# AUTHOR CRUD
-# ======================
+# ---------------- AUTHOR CRUD ----------------
 
-def create_author(name: str, bio: str = None):
-    session = SessionLocal()
-    author = Author(name=name, bio=bio)
-    session.add(author)
-    session.commit()
-    session.refresh(author)
-    session.close()
-    return author
+def create_author(name: str, bio: str | None = None):
+    with SessionLocal() as db:
+        author = Author(name=name, bio=bio)
+        db.add(author)
+        db.commit()
+        db.refresh(author)
+        return author
 
 
 def get_author_by_id(author_id: int):
-    session = SessionLocal()
-    author = session.get(Author, author_id)
-    session.close()
-    return author
+    with SessionLocal() as db:
+        return db.get(Author, author_id)
 
 
 def get_all_authors():
-    session = SessionLocal()
-    authors = session.execute(select(Author)).scalars().all()
-    session.close()
-    return authors
+    with SessionLocal() as db:
+        return db.scalars(select(Author)).all()
 
 
 def update_author(author_id: int, name=None, bio=None):
-    session = SessionLocal()
-    author = session.get(Author, author_id)
+    with SessionLocal() as db:
+        author = db.get(Author, author_id)
 
-    if not author:
-        return None
+        if not author:
+            return None
 
-    if name:
-        author.name = name
-    if bio:
-        author.bio = bio
+        if name:
+            author.name = name
 
-    session.commit()
-    session.close()
-    return author
+        if bio:
+            author.bio = bio
+
+        db.commit()
+        db.refresh(author)
+
+        return author
 
 
 def delete_author(author_id: int):
-    session = SessionLocal()
-    author = session.get(Author, author_id)
+    with SessionLocal() as db:
+        author = db.get(Author, author_id)
 
-    if not author:
-        return False
+        if not author:
+            return False
 
-    if author.books:
-        return False
+        if author.books:
+            return False
 
-    session.delete(author)
-    session.commit()
-    session.close()
+        db.delete(author)
+        db.commit()
 
-    return True
+        return True
 
 
-# ======================
-# BOOK CRUD
-# ======================
+# ---------------- BOOK CRUD ----------------
 
 def create_book(title, author_id, published_year, isbn=None):
-    session = SessionLocal()
 
-    book = Book(
-        title=title,
-        author_id=author_id,
-        published_year=published_year,
-        isbn=isbn
-    )
+    with SessionLocal() as db:
+        book = Book(
+            title=title,
+            author_id=author_id,
+            published_year=published_year,
+            isbn=isbn
+        )
 
-    session.add(book)
-    session.commit()
-    session.refresh(book)
-    session.close()
+        try:
+            db.add(book)
+            db.commit()
+            db.refresh(book)
+            return book
 
-    return book
+        except IntegrityError:
+            db.rollback()
+            return None
 
 
-def get_book_by_id(book_id: int):
-    session = SessionLocal()
-    book = session.get(Book, book_id)
-    session.close()
-    return book
+def get_book_by_id(book_id):
+    with SessionLocal() as db:
+        return db.get(Book, book_id)
 
 
 def get_all_books():
-    session = SessionLocal()
-    books = session.execute(select(Book)).scalars().all()
-    session.close()
-    return books
+    with SessionLocal() as db:
+        return db.scalars(select(Book)).all()
 
 
-def search_books_by_title(title: str):
-    session = SessionLocal()
+def search_books_by_title(title):
 
-    books = session.query(Book).filter(Book.title.ilike(f"%{title}%")).all()
-
-    session.close()
-    return books
+    with SessionLocal() as db:
+        stmt = select(Book).where(Book.title.ilike(f"%{title}%"))
+        return db.scalars(stmt).all()
 
 
-def delete_book(book_id: int):
-    session = SessionLocal()
-    book = session.get(Book, book_id)
+def delete_book(book_id):
 
-    if not book:
-        return False
+    with SessionLocal() as db:
 
-    session.delete(book)
-    session.commit()
-    session.close()
+        book = db.get(Book, book_id)
 
-    return True
+        if not book:
+            return False
+
+        db.delete(book)
+        db.commit()
+
+        return True
 
 
-# ======================
-# STUDENT CRUD
-# ======================
+# ---------------- STUDENT CRUD ----------------
 
 def create_student(full_name, email, grade=None):
-    session = SessionLocal()
 
-    student = Student(
-        full_name=full_name,
-        email=email,
-        grade=grade
-    )
+    with SessionLocal() as db:
 
-    session.add(student)
-    session.commit()
-    session.refresh(student)
-    session.close()
+        student = Student(
+            full_name=full_name,
+            email=email,
+            grade=grade
+        )
 
-    return student
+        try:
+            db.add(student)
+            db.commit()
+            db.refresh(student)
+            return student
+
+        except IntegrityError:
+            db.rollback()
+            return None
 
 
 def get_student_by_id(student_id):
-    session = SessionLocal()
-    student = session.get(Student, student_id)
-    session.close()
-    return student
+
+    with SessionLocal() as db:
+        return db.get(Student, student_id)
 
 
 def get_all_students():
-    session = SessionLocal()
-    students = session.execute(select(Student)).scalars().all()
-    session.close()
-    return students
+
+    with SessionLocal() as db:
+        return db.scalars(select(Student)).all()
 
 
 def update_student_grade(student_id, grade):
-    session = SessionLocal()
-    student = session.get(Student, student_id)
 
-    if not student:
-        return None
+    with SessionLocal() as db:
 
-    student.grade = grade
-    session.commit()
-    session.close()
+        student = db.get(Student, student_id)
 
-    return student
+        if not student:
+            return None
+
+        student.grade = grade
+
+        db.commit()
+        db.refresh(student)
+
+        return student
 
 
-# ======================
-# BORROW LOGIC
-# ======================
+# ---------------- BORROW LOGIC ----------------
 
 def borrow_book(student_id, book_id):
-    session = SessionLocal()
 
-    student = session.get(Student, student_id)
-    book = session.get(Book, book_id)
+    with SessionLocal() as db:
 
-    if not student or not book:
-        return None
+        student = db.get(Student, student_id)
+        book = db.get(Book, book_id)
 
-    if not book.is_available:
-        return None
+        if not student or not book:
+            return None
 
-    active_borrows = session.query(Borrow).filter(
-        Borrow.student_id == student_id,
-        Borrow.returned_at == None
-    ).count()
+        if not book.is_available:
+            return None
 
-    if active_borrows >= 3:
-        return None
+        active_borrows = db.scalar(
+            select(func.count())
+            .select_from(Borrow)
+            .where(
+                Borrow.student_id == student_id,
+                Borrow.returned_at == None
+            )
+        )
 
-    borrow = Borrow(
-        student_id=student_id,
-        book_id=book_id,
-        borrowed_at=datetime.utcnow(),
-        due_date=datetime.utcnow() + timedelta(days=14)
-    )
+        if active_borrows >= 3:
+            return None
 
-    book.is_available = False
+        borrow = Borrow(
+            student_id=student_id,
+            book_id=book_id,
+            borrowed_at=datetime.utcnow(),
+            due_date=datetime.utcnow() + timedelta(days=14)
+        )
 
-    session.add(borrow)
-    session.commit()
-    session.refresh(borrow)
-    session.close()
+        book.is_available = False
 
-    return borrow
+        db.add(borrow)
+        db.commit()
+        db.refresh(borrow)
+
+        return borrow
 
 
 def return_book(borrow_id):
-    session = SessionLocal()
 
-    borrow = session.get(Borrow, borrow_id)
+    with SessionLocal() as db:
 
-    if not borrow or borrow.returned_at:
-        return False
+        borrow = db.get(Borrow, borrow_id)
 
-    borrow.returned_at = datetime.utcnow()
-    borrow.book.is_available = True
+        if not borrow or borrow.returned_at:
+            return False
 
-    session.commit()
-    session.close()
+        borrow.returned_at = datetime.utcnow()
 
-    return True
+        borrow.book.is_available = True
+
+        db.commit()
+
+        return True
 
 
-# ======================
-# QUERIES
-# ======================
+# ---------------- EXTRA QUERIES ----------------
 
 def get_student_borrow_count(student_id):
-    session = SessionLocal()
 
-    count = session.query(Borrow).filter(
-        Borrow.student_id == student_id
-    ).count()
+    with SessionLocal() as db:
 
-    session.close()
-
-    return count
-
-
-def get_books_by_author(author_id):
-    session = SessionLocal()
-
-    books = session.query(Book).filter(
-        Book.author_id == author_id
-    ).all()
-
-    session.close()
-    return books
+        return db.scalar(
+            select(func.count())
+            .select_from(Borrow)
+            .where(Borrow.student_id == student_id)
+        )
 
 
 def get_currently_borrowed_books():
-    session = SessionLocal()
 
-    results = session.query(Book, Student, Borrow.borrowed_at).join(
-        Borrow, Borrow.book_id == Book.id
-    ).join(
-        Student, Student.id == Borrow.student_id
-    ).filter(
-        Borrow.returned_at == None
-    ).all()
+    with SessionLocal() as db:
 
-    session.close()
+        stmt = (
+            select(Book, Student, Borrow.borrowed_at)
+            .join(Borrow)
+            .join(Student)
+            .where(Borrow.returned_at == None)
+        )
 
-    return results
+        return db.execute(stmt).all()
+
+
+def get_books_by_author(author_id):
+
+    with SessionLocal() as db:
+
+        stmt = select(Book).where(Book.author_id == author_id)
+
+        return db.scalars(stmt).all()
 
 
 def get_overdue_borrows():
-    session = SessionLocal()
 
-    now = datetime.utcnow()
+    with SessionLocal() as db:
 
-    borrows = session.query(Borrow, Student, Book).join(
-        Student
-    ).join(
-        Book
-    ).filter(
-        Borrow.returned_at == None,
-        Borrow.due_date < now
-    ).all()
+        now = datetime.utcnow()
 
-    result = []
+        stmt = (
+            select(Borrow, Student, Book)
+            .join(Student)
+            .join(Book)
+            .where(
+                Borrow.returned_at == None,
+                Borrow.due_date < now
+            )
+        )
 
-    for borrow, student, book in borrows:
-        days = (now - borrow.due_date).days
-        result.append((borrow, student, book, days))
+        results = []
 
-    session.close()
+        for borrow, student, book in db.execute(stmt).all():
 
-    return result
+            days_late = (now - borrow.due_date).days
+
+            results.append((borrow, student, book, days_late))
+
+        return results
