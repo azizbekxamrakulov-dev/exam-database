@@ -4,6 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
 
+
 class Author(Base):
     __tablename__ = "authors"
 
@@ -13,6 +14,7 @@ class Author(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     books = relationship("Book", back_populates="author")
+
 
 
 class Book(Base):

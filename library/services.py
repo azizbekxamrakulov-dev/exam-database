@@ -7,6 +7,7 @@ from .models import Author, Book, Student, Borrow
 
 # ---------------- AUTHOR CRUD ----------------
 
+
 def create_author(name: str, bio: str | None = None):
     with SessionLocal() as db:
         author = Author(name=name, bio=bio)
@@ -14,6 +15,7 @@ def create_author(name: str, bio: str | None = None):
         db.commit()
         db.refresh(author)
         return author
+
 
 
 def get_author_by_id(author_id: int):
